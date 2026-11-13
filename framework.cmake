@@ -22,3 +22,10 @@ if(FW_BOARD STREQUAL "f103")
         "${FW_ROOT}/BSP/i2c.cpp"
         "${FW_ROOT}/Module/mpu6050.cpp")
 endif()
+
+if(FW_BOARD STREQUAL "f103")
+    target_sources(${FW_TARGET} PRIVATE
+        "${FW_ROOT}/Application/display.cpp"
+        "${FW_ROOT}/BSP/spi.cpp"
+        "${FW_ROOT}/Module/oled.cpp")
+endif()

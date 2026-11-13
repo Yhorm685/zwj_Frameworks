@@ -3,6 +3,7 @@
 #include "cmsis_os2.h"
 #ifdef FRAMEWORK_F103
 #include "Application/sensors.hpp"
+#include "Application/display.hpp"
 #endif
 
 namespace fw::app {
@@ -28,6 +29,7 @@ bool boardCommand(Frame frame, Logger& log) {
         return true;
     }
 #ifdef FRAMEWORK_F103
+    if (displayCommand(frame, log)) return true;
     if (sensorCommand(frame, log)) return true;
     if (frame.command >= 0x11 && frame.command <= 0x14) {
         const bool second = frame.command == 0x12 || frame.command == 0x14;
@@ -61,4 +63,5 @@ bool boardCommand(Frame frame, Logger& log) {
     return false;
 }
 }
+
 
