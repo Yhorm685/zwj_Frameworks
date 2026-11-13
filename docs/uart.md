@@ -47,6 +47,18 @@ Pop-Location
 | 2 | `A5 01 11 B6` | `[FRAME][ChecksumError] receive` |
 | 3 | `A5 01 11 B7` | `[ECHO][Ok] arg=17` |
 
-正确校验为 0xB7，参数 0x11 对应十进制 17。两次坏帧均得到校验错误，随后有效帧的参数被正确回送，验证了 PC 与板卡的双向通信和校验错误后的恢复。半帧超时及中断发送的完成状态仍需分别实测。
+正确校验为 0xB7，参数 0x11 对应十进制 17。两次坏帧均得到校验错误，随后有效帧的参数被正确回送，验证了 PC 与板卡的双向通信和校验错误后的恢复。
 
 ![两次坏帧及随后正确帧的回包](evidence/f103-uart-checksum-recovery.png)
+
+## 2026-11-13 · 半帧超时和中断发送
+
+沿用步骤 3 串口固件与 HEX 发送方式。实际收发顺序见[串口原始截图](evidence/f103-uart-timeout-it-tx.png)。
+
+| 输入 | 实际回包 |
+| --- | --- |
+| 首次发送 `A5 01` | `[FRAME][Timeout] partial frame` |
+| 随后发送 `A5 02 00 A7` | 先收到 `IT TX`，随后依次为 `[UART][Busy] second start`、`[UART][Ok] interrupt TX final` |
+| 再次发送 `A5 01` | `[FRAME][Timeout] partial frame` |
+
+协议在最后一个已收字节后检查间隔。未完成帧的间隔达到 20 ms 时，解析器丢弃该帧并返回 Timeout。手动操作中留一秒用于观察回复。截图没有收发时间戳，因此本次验证了两次超时处理及下一条有效命令的执行，具体延迟尚未测量。中断发送用例也观察到第二次启动返回 Busy，首笔传输的最终结果为 Ok。
