@@ -1,0 +1,18 @@
+     0.000 ms  SETUP  2026-11-13T22:33:23.8152610+08:00 COM4 115200 8N1, Stopwatch host timestamps, TX hex, RX ASCII
+    32.526 ms  HOST   One warm-up query, then six measured queries
+    36.448 ms  TX     A5 10 00 B5
+    44.511 ms  RX     [TIM2][Ok] ticks=193067
+    60.594 ms  TX     A5 10 00 B5
+    65.006 ms  RX     [TIM2][Ok] ticks=193089
+  1071.599 ms  TX     A5 10 00 B5
+  1076.065 ms  RX     [TIM2][Ok] ticks=194100
+  2090.250 ms  TX     A5 10 00 B5
+  2094.704 ms  RX     [TIM2][Ok] ticks=195119
+  3110.814 ms  TX     A5 10 00 B5
+  3115.522 ms  RX     [TIM2][Ok] ticks=196140
+  4129.661 ms  TX     A5 10 00 B5
+  4134.206 ms  RX     [TIM2][Ok] ticks=197159
+  5147.919 ms  TX     A5 10 00 B5
+  5152.445 ms  RX     [TIM2][Ok] ticks=198177
+  5167.754 ms  RESULT first=193089 last=198177 delta=5088 host_span_mid_ms=5087.382 span_bounds_ms=[5082.913,5091.851] mean_ms_per_tick=0.999879 mean_bounds_ms_per_tick=[0.999000,1.000757]
+  5172.299 ms  HOST   COM4 closed
