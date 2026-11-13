@@ -36,3 +36,17 @@ cmake --preset Debug -B $uartOutput
 cmake --build $uartOutput
 Pop-Location
 ```
+
+## 2026-11-13 · 坏帧后回送恢复
+
+板卡为 STM32F103C8T6，按步骤 3 的 UART 用例以 HEX 单次发送。下表按串口助手截图中相邻的发送与接收行转录。截图中未显示固件版本或复位首行。
+
+| 次序 | PC 发送 | 板端回复 |
+| --- | --- | --- |
+| 1 | `A5 01 11 B6` | `[FRAME][ChecksumError] receive` |
+| 2 | `A5 01 11 B6` | `[FRAME][ChecksumError] receive` |
+| 3 | `A5 01 11 B7` | `[ECHO][Ok] arg=17` |
+
+正确校验为 0xB7，参数 0x11 对应十进制 17。两次坏帧均得到校验错误，随后有效帧的参数被正确回送，验证了 PC 与板卡的双向通信和校验错误后的恢复。半帧超时及中断发送的完成状态仍需分别实测。
+
+![两次坏帧及随后正确帧的回包](evidence/f103-uart-checksum-recovery.png)
