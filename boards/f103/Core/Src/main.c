@@ -18,6 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -43,11 +45,14 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+/* Available before the UART and scheduler are initialized. */
+const char * volatile framework_fault_file;
+volatile uint32_t framework_fault_line;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -86,12 +91,23 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
+  /* Init scheduler */
+  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  Error_Handler();
   while (1)
   {
     /* USER CODE END WHILE */
@@ -141,7 +157,20 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+#undef Error_Handler
 
+void Framework_Fatal(const char *file, uint32_t line)
+{
+  __disable_irq();
+  framework_fault_file = file;
+  framework_fault_line = line;
+  Error_Handler();
+}
+
+__weak void Framework_TimerElapsed(TIM_HandleTypeDef *htim)
+{
+  (void)htim;
+}
 /* USER CODE END 4 */
 
 /**
@@ -162,7 +191,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-
+  if (htim->Instance != TIM4)
+  {
+    Framework_TimerElapsed(htim);
+  }
   /* USER CODE END Callback 1 */
 }
 

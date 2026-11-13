@@ -53,7 +53,8 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void Framework_Fatal(const char *file, uint32_t line);
+#define Error_Handler() Framework_Fatal(__FILE__, __LINE__)
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

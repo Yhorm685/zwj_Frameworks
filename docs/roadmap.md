@@ -3,7 +3,7 @@
 | 步骤 | 工作 | CubeMX 配置 | 验收 | 当前状态 |
 | --- | --- | --- | --- | --- |
 | 1 | 建立 F103 时钟与调试接口 | RCC、SWD、TIM4 HAL 时基 | CubeMX 生成 C 工程，核对时钟树并链接 ELF | 已生成并构建 |
-| 2 | 建立 F103 调度与串口基线 | USART1、CMSIS-RTOS v2、Comm 栈和优先级 | C++17 入口、Ozone，串口观察启动和心跳 | 待实施 |
+| 2 | 建立 F103 调度与串口基线 | USART1、CMSIS-RTOS v2、Comm 栈和优先级 | C++17 入口、Ozone，串口观察启动和心跳 | 软件已构建，实机待验 |
 | 3 | 封装 UART 与统一日志 | USART1 全局中断 | 阻塞和中断收发、Busy、坏校验、半帧超时与恢复 | 待实施 |
 | 4 | 封装定时器与两路舵机 | TIM2、中断、TIM3 两路 PWM 和引脚 | 核对 1 ms 计数、两路 50 Hz PWM 与独立动作 | 待实施 |
 | 5 | 接入 I²C 和 MPU6050 | I²C1、事件/错误 IRQ、Sensor/Monitor、两个消息队列 | 两种读写方式、量程换算、设备断开后恢复 | 待实施 |
@@ -14,3 +14,7 @@
 ## 步骤 1 · 建立 F103 时钟与调试接口
 
 从 STM32F103C8T6 新工程起步。8 MHz HSE 经 PLL ×9 得到 72 MHz，APB1 为 36 MHz，APB2 为 72 MHz；保留 PA13/PA14 的 SWD。TIM4 提供 HAL tick。Debug 已交叉编译，见本阶段 .ioc 和生成的 SystemClock_Config。
+
+## 步骤 2 · 建立 F103 调度与串口基线
+
+在 CubeMX 中配置 USART1 PA9/PA10（115200、8N1）和 Comm（Normal、256 words）。SysTick 供 FreeRTOS，TIM4 保留给 HAL。J-Link/Ozone 与用户 C++ 任务入口已接入。首次上板只需主板、J-Link 和串口模块，见 [基线测试](bringup.md)。

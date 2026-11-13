@@ -1,5 +1,5 @@
 # Helios Frameworks
 
-任务 01 的 STM32 电控框架。当前提交是 STM32CubeMX 实际生成的 F103 时钟与 SWD 工程。进入 boards/f103 后运行 `cmake --preset Debug` 和 `cmake --build --preset Debug`。实施进度、引脚和纸面要求见下方记录。
+F103C8T6 为主板，板级配置保存在 boards/f103/f103.ioc。进入 boards/f103 后运行 `cmake --preset Debug`、`cmake --build --preset Debug`，再从同目录的 Ozone 工程使用 J-Link/SWD 加载 ELF。串口 PA9/TX、PA10/RX，115200、8N1。
 
-[实施路线](docs/roadmap.md) · [需求与验收](docs/requirements.md) · [跃鹿参考分析](docs/reference.md)
+[实施路线](docs/roadmap.md) · [首次上板](docs/bringup.md) · [题目清单](docs/requirements.md) · [参考分析](docs/reference.md)

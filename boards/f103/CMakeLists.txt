@@ -10,6 +10,9 @@ cmake_minimum_required(VERSION 3.22)
 # Setup compiler settings
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_EXTENSIONS ON)
 
 
@@ -29,9 +32,11 @@ project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Enable CMake support for ASM and C languages
-enable_language(C ASM)
+enable_language(C CXX ASM)
 
 # Create an executable object type
+# Keep debug symbols while fitting the 64 KiB F103.
+add_compile_options($<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:C,CXX>>:-Os>)
 add_executable(${CMAKE_PROJECT_NAME})
 
 # Add STM32CubeMX generated sources
@@ -66,3 +71,13 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
     # Add user defined libraries
 )
+
+set(FW_BOARD f103)
+set(FW_TARGET ${CMAKE_PROJECT_NAME})
+get_filename_component(FW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+target_compile_definitions(${FW_TARGET} PRIVATE FRAMEWORK_F103=1)
+include("${FW_ROOT}/framework.cmake")
+add_custom_command(TARGET ${FW_TARGET} POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${FW_TARGET}>
+            $<TARGET_FILE_DIR:${FW_TARGET}>/${FW_TARGET}.bin
+    VERBATIM)
