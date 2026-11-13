@@ -9,7 +9,7 @@
 | 用例 | 预期 | 实测 |
 | --- | --- | --- |
 | J-Link 下载与校验 | 目标识别正确，Ozone 下载完成 | 待回传 |
-| 复位与调度 | 首行 F103 BASELINE READY，此后约每秒一行 TICK 1s | 待回传 |
+| 复位与调度 | 首行 F103 BASELINE READY，此后约每秒一行 TICK 1s | 心跳已实测，启动首行和实际间隔待记录 |
 | 断点检查 | 在 Framework_Run 内暂停可读取 fwHeartbeat；连续运行后再暂停应递增，fwBootTxErrors 为 0 | 待回传 |
 
 请回传板卡型号、晶振标识、Ozone 的连接/下载结果，以及从复位开始至少 5 秒的串口原始文本。出现异常时保留原有输出、PC 所在函数或 Ozone 报错。调试器暂停期间的时间间隔不计入周期测量。
@@ -28,3 +28,11 @@ cmake --preset Debug -B $baselineOutput
 cmake --build $baselineOutput
 Pop-Location
 ```
+
+## 2026-11-13 · COM4 心跳实测
+
+使用步骤 2 的 F103 基线 `57aa484` 复测。串口助手显示 COM4 已打开，115200、无校验、8 数据位、1 停止位。接收区连续可见 6 行 `TICK 1s`。结合基线任务中循环发送心跳的代码，这次验证了 F103 的任务能重复运行，USART1 TX 到电脑的接收链路可用。
+
+截图未包含复位后的首行、接收时间戳、Ozone 下载输出和断点变量。实际心跳周期与串口接收方向分别留待有对应记录时确认。
+
+![F103 基线在 COM4 连续输出六行心跳](evidence/f103-baseline-com4-heartbeat.png)
