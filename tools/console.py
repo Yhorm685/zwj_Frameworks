@@ -21,22 +21,25 @@ def collect(port, seconds):
 def smoke(port):
     def check(payload, expected, seconds=0.3):
         port.write(payload)
-        observed = collect(port, seconds)
-        for marker in expected:
-            if marker not in observed:
-                raise RuntimeError(f"missing {marker!r}")
+        observed = collect(port, seconds).splitlines()
+        # Sensor and monitor reports may interleave. Every console response must match exactly.
+        replies = [line for line in observed
+                   if line == "IT TX" or line.startswith(("[ECHO]", "[FRAME]", "[UART]", "[CMD]"))]
+        if replies != expected:
+            raise RuntimeError(f"expected {expected!r}, got {replies!r}")
 
-    check(packet(1, 17) + packet(1, 18), ["arg=17", "arg=18"])
+    check(packet(1, 17) + packet(1, 18), ["[ECHO][Ok] arg=17", "[ECHO][Ok] arg=18"])
     wrong = bytearray(packet(1))
     wrong[-1] ^= 1
-    check(wrong + packet(1, 19), ["ChecksumError", "arg=19"])
-    check(packet(1)[:2], ["Timeout"])
-    check(packet(2), ["IT TX", "[UART][Busy]", "interrupt TX final"])
+    check(wrong + packet(1, 19), ["[FRAME][ChecksumError] receive", "[ECHO][Ok] arg=19"])
+    check(packet(1)[:2], ["[FRAME][Timeout] partial frame"])
+    check(packet(2), ["IT TX", "[UART][Busy] second start", "[UART][Ok] interrupt TX final"])
     for mode in (3, 4):
-        check(packet(mode), ["send one byte"], 0.10)
+        prompt = "[UART][Ok] send one byte within 500 ms"
+        check(packet(mode), [prompt], 0.10)
         check(b"Z", ["[UART][Ok] byte=90"])
-        check(packet(mode), ["[UART][Timeout]"], 0.8)
-    check(packet(1, 20), ["arg=20"])
+        check(packet(mode), [prompt, "[UART][Timeout] byte=0"], 0.8)
+    check(packet(1, 20), ["[ECHO][Ok] arg=20"])
     print("UART acceptance sequence passed.")
 
 
