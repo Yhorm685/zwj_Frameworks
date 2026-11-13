@@ -1,0 +1,34 @@
+    10.739 ms  SETUP 2026-11-13T22:26:55.9156544+08:00; COM4 115200 8N1; PC timestamps; TX=hex, RX=ASCII lines
+    22.378 ms  TX    A5 01 11 B7 A5 01 12 B8
+    43.136 ms  RX    [ECHO][Ok] arg=17
+    44.002 ms  RX    [ECHO][Ok] arg=18
+    44.248 ms  TX    A5 01 00 A7 A5 01 13 B9
+    48.456 ms  RX    [FRAME][ChecksumError] receive
+    51.286 ms  RX    [ECHO][Ok] arg=19
+    51.710 ms  TX    A5 01
+    76.056 ms  RX    [FRAME][Timeout] partial frame
+    77.748 ms  HOST  partial frame: end of PC Write to complete reply observed on PC = 24.6 ms
+    77.993 ms  TX    A5 02 00 A7
+    82.641 ms  RX    IT TX
+    85.633 ms  RX    [UART][Busy] second start
+    86.810 ms  RX    [UART][Ok] interrupt TX final
+    88.757 ms  TX    A5 03 00 A8
+    94.882 ms  RX    [UART][Ok] send one byte within 500 ms
+   140.711 ms  TX    5A
+   144.842 ms  RX    [UART][Ok] byte=90
+   145.195 ms  TX    A5 03 00 A8
+   151.266 ms  RX    [UART][Ok] send one byte within 500 ms
+   653.736 ms  RX    [UART][Timeout] byte=0
+   654.393 ms  TX    A5 01 14 BA
+   658.555 ms  RX    [ECHO][Ok] arg=20
+   658.963 ms  TX    A5 04 00 A9
+   665.447 ms  RX    [UART][Ok] send one byte within 500 ms
+   711.352 ms  TX    5A
+   715.916 ms  RX    [UART][Ok] byte=90
+   716.484 ms  TX    A5 04 00 A9
+   722.396 ms  RX    [UART][Ok] send one byte within 500 ms
+  1225.269 ms  RX    [UART][Timeout] byte=0
+  1225.849 ms  TX    A5 01 14 BA
+  1229.905 ms  RX    [ECHO][Ok] arg=20
+  1230.173 ms  PASS  All replies matched
+  1232.180 ms  PORT  COM4 closed
