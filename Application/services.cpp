@@ -1,14 +1,26 @@
 #include "Application/commands.hpp"
 #include "BSP/board_timer.hpp"
 #include "cmsis_os2.h"
+#ifdef FRAMEWORK_F103
+#include "Application/sensors.hpp"
+#endif
 
 namespace fw::app {
 void startServices(Logger& log) {
     auto& clock = board::clockTimer();
     logResult(log, "TIM2", clock.waitUpdate(10), "polled update");
     logResult(log, "TIM2", clock.startPeriodic(), "1 ms interrupt");
+#ifdef FRAMEWORK_F103
+    startWorkers(log);
+#endif
 }
-void serviceEvents(Logger&) {}
+void serviceEvents(Logger& log) {
+#ifdef FRAMEWORK_F103
+    drainWorkers(log);
+#else
+    (void)log;
+#endif
+}
 
 bool boardCommand(Frame frame, Logger& log) {
     if (frame.command == 0x10) {
@@ -16,6 +28,7 @@ bool boardCommand(Frame frame, Logger& log) {
         return true;
     }
 #ifdef FRAMEWORK_F103
+    if (sensorCommand(frame, log)) return true;
     if (frame.command >= 0x11 && frame.command <= 0x14) {
         const bool second = frame.command == 0x12 || frame.command == 0x14;
         auto& axis = board::servo(second);
@@ -48,3 +61,4 @@ bool boardCommand(Frame frame, Logger& log) {
     return false;
 }
 }
+

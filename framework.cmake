@@ -15,3 +15,10 @@ target_sources(${FW_TARGET} PRIVATE
     "${FW_ROOT}/BSP/board_timer.cpp"
     "${FW_ROOT}/BSP/timer.cpp"
     "${FW_ROOT}/BSP/pwm.cpp")
+
+if(FW_BOARD STREQUAL "f103")
+    target_sources(${FW_TARGET} PRIVATE
+        "${FW_ROOT}/Application/sensors.cpp"
+        "${FW_ROOT}/BSP/i2c.cpp"
+        "${FW_ROOT}/Module/mpu6050.cpp")
+endif()

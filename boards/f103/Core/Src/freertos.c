@@ -25,10 +25,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "Application/rtos_messages.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticQueue_t osStaticMessageQDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -54,6 +56,42 @@ const osThreadAttr_t comm_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for sensor */
+osThreadId_t sensorHandle;
+const osThreadAttr_t sensor_attributes = {
+  .name = "sensor",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for monitor */
+osThreadId_t monitorHandle;
+const osThreadAttr_t monitor_attributes = {
+  .name = "monitor",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityBelowNormal,
+};
+/* Definitions for requestQueue */
+osMessageQueueId_t requestQueueHandle;
+uint8_t requestBuffer[ 4 * sizeof( uint16_t ) ];
+osStaticMessageQDef_t requestControl;
+const osMessageQueueAttr_t requestQueue_attributes = {
+  .name = "requestQueue",
+  .cb_mem = &requestControl,
+  .cb_size = sizeof(requestControl),
+  .mq_mem = &requestBuffer,
+  .mq_size = sizeof(requestBuffer)
+};
+/* Definitions for eventQueue */
+osMessageQueueId_t eventQueueHandle;
+uint8_t eventBuffer[ 8 * sizeof( FrameworkSensorEvent ) ];
+osStaticMessageQDef_t eventControl;
+const osMessageQueueAttr_t eventQueue_attributes = {
+  .name = "eventQueue",
+  .cb_mem = &eventControl,
+  .cb_size = sizeof(eventControl),
+  .mq_mem = &eventBuffer,
+  .mq_size = sizeof(eventBuffer)
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -61,6 +99,8 @@ void Framework_Run(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
+extern void StartSensor(void *argument);
+extern void StartMonitor(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -89,6 +129,13 @@ void MX_FREERTOS_Init(void) {
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of requestQueue */
+  requestQueueHandle = osMessageQueueNew (4, sizeof(uint16_t), &requestQueue_attributes);
+
+  /* creation of eventQueue */
+  eventQueueHandle = osMessageQueueNew (8, sizeof(FrameworkSensorEvent), &eventQueue_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -97,8 +144,15 @@ void MX_FREERTOS_Init(void) {
   /* creation of comm */
   commHandle = osThreadNew(StartDefaultTask, NULL, &comm_attributes);
 
+  /* creation of sensor */
+  sensorHandle = osThreadNew(StartSensor, NULL, &sensor_attributes);
+
+  /* creation of monitor */
+  monitorHandle = osThreadNew(StartMonitor, NULL, &monitor_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
-  if (commHandle == NULL)
+  if (commHandle == NULL || sensorHandle == NULL || monitorHandle == NULL ||
+      requestQueueHandle == NULL || eventQueueHandle == NULL)
   {
     Error_Handler();
   }
