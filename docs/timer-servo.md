@@ -11,3 +11,18 @@ SG90 信号为 PB0/TIM3_CH3 与 PB1/TIM3_CH4。TIM3 为 50 Hz，初始脉宽 150
 | 11 / 12 | 181 或 255 | 前者返回 InvalidArgument，后者停止该通道 |
 
 硬件测试请回传操作顺序、原始串口日志和两路舵机动作的视频。重复性和角度误差可在云台任务中另行测量。
+
+## 步骤 4 独立固件
+
+测试版本为 `1a6ed94`。在工程内打开 [定时器 Ozone 工程](../boards/f103/f103-timer.jdebug)，调试器会加载 `boards/f103/build/timer/f103.elf`。先保持两只舵机断开，只检查启动时的 TIM2 轮询、1 ms 周期中断和命令 10 的计数；保留 PC 的收发时间及两次 ticks。随后再单独接入舵机验证动作。
+
+新检出仓库后可从根目录构建这一固定版本。首次建立工作树后，可以直接重新构建。
+
+```powershell
+git worktree add --detach build/timer-src 1a6ed94
+$timerOutput = Join-Path (Get-Location) 'boards/f103/build/timer'
+Push-Location build/timer-src/boards/f103
+cmake --preset Debug -B $timerOutput
+cmake --build $timerOutput
+Pop-Location
+```
