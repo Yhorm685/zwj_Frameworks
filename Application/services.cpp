@@ -4,6 +4,7 @@
 #ifdef FRAMEWORK_F103
 #include "Application/sensors.hpp"
 #include "Application/display.hpp"
+#include "Application/can_test.hpp"
 #endif
 
 namespace fw::app {
@@ -29,6 +30,7 @@ bool boardCommand(Frame frame, Logger& log) {
         return true;
     }
 #ifdef FRAMEWORK_F103
+    if (canCommand(frame, log)) return true;
     if (displayCommand(frame, log)) return true;
     if (sensorCommand(frame, log)) return true;
     if (frame.command >= 0x11 && frame.command <= 0x14) {

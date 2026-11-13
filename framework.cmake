@@ -29,3 +29,9 @@ if(FW_BOARD STREQUAL "f103")
         "${FW_ROOT}/BSP/spi.cpp"
         "${FW_ROOT}/Module/oled.cpp")
 endif()
+
+if(FW_BOARD STREQUAL "f103")
+    target_sources(${FW_TARGET} PRIVATE
+        "${FW_ROOT}/Application/can_test.cpp"
+        "${FW_ROOT}/BSP/can.cpp")
+endif()
