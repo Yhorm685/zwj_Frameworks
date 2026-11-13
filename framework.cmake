@@ -10,3 +10,8 @@ target_sources(${FW_TARGET} PRIVATE
     "${FW_ROOT}/BSP/board.cpp"
     "${FW_ROOT}/BSP/uart.cpp"
     "${FW_ROOT}/Common/logger.cpp")
+
+target_sources(${FW_TARGET} PRIVATE
+    "${FW_ROOT}/BSP/board_timer.cpp"
+    "${FW_ROOT}/BSP/timer.cpp"
+    "${FW_ROOT}/BSP/pwm.cpp")
