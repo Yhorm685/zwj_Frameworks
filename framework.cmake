@@ -5,5 +5,8 @@ target_compile_options(${FW_TARGET} PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 target_sources(${FW_TARGET} PRIVATE
-    "${FW_ROOT}/Application/baseline.cpp"
-    "${FW_ROOT}/BSP/bringup.cpp")
+    "${FW_ROOT}/Application/console.cpp"
+    "${FW_ROOT}/Application/services.cpp"
+    "${FW_ROOT}/BSP/board.cpp"
+    "${FW_ROOT}/BSP/uart.cpp"
+    "${FW_ROOT}/Common/logger.cpp")
