@@ -1,0 +1,13 @@
+接收← [F103][Ok] framework ready
+[TIM2][Ok] polled update
+[TIM2][Ok] 1 ms interrupt
+发送→ A5 13 50 08
+接收← [YAW][Ok] arg=80
+发送→ A5 13 64 1C
+接收← [YAW][Ok] arg=100
+发送→ A5 13 64 1C
+接收← [YAW][Ok] arg=100
+发送→ A5 11 FF B5
+接收← [YAW][Ok] arg=255
+发送→ A5 11 FF B5
+接收← [YAW][NotInitialized] arg=255
