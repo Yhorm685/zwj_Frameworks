@@ -5,6 +5,7 @@
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "cmsis_os2.h"
 #include <atomic>
 
 namespace fw::detail {
@@ -32,6 +33,31 @@ inline Status status(HAL_StatusTypeDef result) {
 inline bool validTimeout(uint32_t ms) { return ms > 0 && ms <= INT32_MAX; }
 inline bool expired(uint32_t start, uint32_t duration) { return HAL_GetTick() - start >= duration; }
 inline void nextTick() { vTaskDelay(1); }
+
+// The caller checks the peripheral's final state after every wakeup.
+class CompletionSignal {
+    const osSemaphoreId_t& handle_;
+public:
+    explicit constexpr CompletionSignal(const osSemaphoreId_t& handle) : handle_(handle) {}
+
+    // Called under the peripheral gate, before enabling an interrupt transfer.
+    bool reset() const {
+        if (!handle_) return false;
+        const auto result = osSemaphoreAcquire(handle_, 0);
+        return result == osOK || result == osErrorResource;
+    }
+
+    void notify() const {
+        if (handle_) (void)osSemaphoreRelease(handle_);
+    }
+
+    void wait(uint32_t startMs, uint32_t timeoutMs) const {
+        const uint32_t elapsed = HAL_GetTick() - startMs;
+        if (elapsed >= timeoutMs) return;
+        static_assert(configTICK_RATE_HZ == 1000, "F103 completion waits use one RTOS tick per ms");
+        (void)osSemaphoreAcquire(handle_, timeoutMs - elapsed);
+    }
+};
 
 // Each peripheral has its own ticket sequence. Call under the peripheral gate.
 struct Operation {

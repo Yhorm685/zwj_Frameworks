@@ -3,12 +3,19 @@
 #include "i2c.h"
 #include <cstring>
 
+extern "C" osSemaphoreId_t i2cDoneHandle;
+
 namespace fw::i2c {
 namespace {
 std::atomic_flag gate = ATOMIC_FLAG_INIT;
 detail::Operation operation;
+detail::CompletionSignal completion{i2cDoneHandle};
 uint8_t storage[64];
 size_t readSize{};
+
+void notifyCompletion(I2C_HandleTypeDef* handle) {
+    if (handle == &hi2c1) completion.notify();
+}
 
 bool valid(uint8_t address, size_t size, uint32_t ms) {
     return address >= 0x08 && address <= 0x77 && size && size <= sizeof(storage) && detail::validTimeout(ms);
@@ -46,6 +53,7 @@ Status run(bool reading, uint8_t address, uint8_t reg, uint8_t* data, size_t siz
     const uint16_t n = static_cast<uint16_t>(size);
     HAL_StatusTypeDef rc;
     if (ticket) {
+        if (!completion.reset()) return Status::NotInitialized;
         if (!reading) std::memcpy(storage, data, size);
         operation.arm(*ticket, ms);
         readSize = reading ? size : 0;
@@ -86,7 +94,7 @@ Status wait(Ticket ticket, uint8_t* output, size_t capacity) {
             const auto recovered = restore();
             return recovered == Status::Ok ? Status::Timeout : recovered;
         }
-        detail::nextTick();
+        completion.wait(operation.start, operation.duration);
     }
     operation.active = false;
     if (HAL_I2C_GetError(&hi2c1) != HAL_I2C_ERROR_NONE) return mapped(HAL_ERROR);
@@ -127,4 +135,10 @@ Status recover() {
     detail::Gate lock(gate);
     return lock ? restore() : Status::Busy;
 }
+}
+
+extern "C" {
+void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef* handle) { fw::i2c::notifyCompletion(handle); }
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef* handle) { fw::i2c::notifyCompletion(handle); }
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef* handle) { fw::i2c::notifyCompletion(handle); }
 }

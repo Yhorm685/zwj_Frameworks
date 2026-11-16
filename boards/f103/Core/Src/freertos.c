@@ -31,6 +31,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 typedef StaticQueue_t osStaticMessageQDef_t;
+typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -92,6 +93,38 @@ const osMessageQueueAttr_t eventQueue_attributes = {
   .mq_mem = &eventBuffer,
   .mq_size = sizeof(eventBuffer)
 };
+/* Definitions for i2cDone */
+osSemaphoreId_t i2cDoneHandle;
+osStaticSemaphoreDef_t i2cDoneControl;
+const osSemaphoreAttr_t i2cDone_attributes = {
+  .name = "i2cDone",
+  .cb_mem = &i2cDoneControl,
+  .cb_size = sizeof(i2cDoneControl),
+};
+/* Definitions for spiDone */
+osSemaphoreId_t spiDoneHandle;
+osStaticSemaphoreDef_t spiDoneControl;
+const osSemaphoreAttr_t spiDone_attributes = {
+  .name = "spiDone",
+  .cb_mem = &spiDoneControl,
+  .cb_size = sizeof(spiDoneControl),
+};
+/* Definitions for canTxDone */
+osSemaphoreId_t canTxDoneHandle;
+osStaticSemaphoreDef_t canTxDoneControl;
+const osSemaphoreAttr_t canTxDone_attributes = {
+  .name = "canTxDone",
+  .cb_mem = &canTxDoneControl,
+  .cb_size = sizeof(canTxDoneControl),
+};
+/* Definitions for canRxReady */
+osSemaphoreId_t canRxReadyHandle;
+osStaticSemaphoreDef_t canRxReadyControl;
+const osSemaphoreAttr_t canRxReady_attributes = {
+  .name = "canRxReady",
+  .cb_mem = &canRxReadyControl,
+  .cb_size = sizeof(canRxReadyControl),
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -120,6 +153,19 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* creation of i2cDone */
+  i2cDoneHandle = osSemaphoreNew(1, 0, &i2cDone_attributes);
+
+  /* creation of spiDone */
+  spiDoneHandle = osSemaphoreNew(1, 0, &spiDone_attributes);
+
+  /* creation of canTxDone */
+  canTxDoneHandle = osSemaphoreNew(1, 0, &canTxDone_attributes);
+
+  /* creation of canRxReady */
+  canRxReadyHandle = osSemaphoreNew(1, 0, &canRxReady_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
