@@ -3,11 +3,18 @@
 #include "spi.h"
 #include <cstring>
 
+extern "C" osSemaphoreId_t spiDoneHandle;
+
 namespace fw::spi {
 namespace {
 std::atomic_flag gate = ATOMIC_FLAG_INIT;
 detail::Operation operation;
+detail::CompletionSignal completion{spiDoneHandle};
 uint8_t buffer[128];
+
+void notifyCompletion(SPI_HandleTypeDef* handle) {
+    if (handle == &hspi1) completion.notify();
+}
 
 void select(bool active) { HAL_GPIO_WritePin(OLED_CS_GPIO_Port, OLED_CS_Pin, active ? GPIO_PIN_RESET : GPIO_PIN_SET); }
 void commandData(bool data) { HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, data ? GPIO_PIN_SET : GPIO_PIN_RESET); }
@@ -29,6 +36,7 @@ Status transmit(bool data, const uint8_t* bytes, size_t size, Ticket* ticket, ui
     detail::Gate lock(gate);
     if (!lock || operation.active) return Status::Busy;
     if (hspi1.Instance != SPI1 || HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_RESET) return Status::NotInitialized;
+    if (ticket && !completion.reset()) return Status::NotInitialized;
     commandData(data);
     select(true);
     if (!ticket) {
@@ -62,7 +70,7 @@ Status wait(Ticket ticket) {
             const auto recovered = restore();
             return recovered == Status::Ok ? Status::Timeout : recovered;
         }
-        detail::nextTick();
+        completion.wait(operation.start, operation.duration);
     }
     operation.active = false;
     select(false);
@@ -103,4 +111,9 @@ Status recover() {
     detail::Gate lock(gate);
     return lock ? restore() : Status::Busy;
 }
+}
+
+extern "C" {
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef* handle) { fw::spi::notifyCompletion(handle); }
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef* handle) { fw::spi::notifyCompletion(handle); }
 }
