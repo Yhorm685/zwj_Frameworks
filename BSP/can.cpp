@@ -3,10 +3,15 @@
 #include "can.h"
 #include <array>
 
+extern "C" {
+extern osSemaphoreId_t canTxDoneHandle, canRxReadyHandle;
+}
+
 namespace fw::can {
 namespace {
 std::atomic_flag gate = ATOMIC_FLAG_INIT;
 detail::Operation tx;
+detail::CompletionSignal txDone{canTxDoneHandle}, rxReady{canRxReadyHandle};
 uint32_t mailbox{};
 bool online{}, internalLoopback{};
 TransferMode transferMode = TransferMode::Blocking;
@@ -16,7 +21,7 @@ std::atomic<unsigned> head{}, tail{};
 constexpr uint32_t txErrors = HAL_CAN_ERROR_TX_ALST0 | HAL_CAN_ERROR_TX_TERR0 |
     HAL_CAN_ERROR_TX_ALST1 | HAL_CAN_ERROR_TX_TERR1 | HAL_CAN_ERROR_TX_ALST2 | HAL_CAN_ERROR_TX_TERR2;
 
-Status setup(bool loopback, TransferMode mode) {
+Status configureController(bool loopback, TransferMode mode) {
     online = false;
     tx.active = false;
     if (hcan.Instance != CAN1) return Status::NotInitialized;
@@ -35,6 +40,8 @@ Status setup(bool loopback, TransferMode mode) {
     rxFault.store(Status::Ok);
     internalLoopback = loopback;
     transferMode = mode;
+    if (mode == TransferMode::Interrupt && (!txDone.reset() || !rxReady.reset()))
+        return Status::NotInitialized;
     hcan.Init.Mode = loopback ? CAN_MODE_SILENT_LOOPBACK : CAN_MODE_NORMAL;
     auto rc = HAL_CAN_Init(&hcan);
     if (rc != HAL_OK) return detail::status(rc);
@@ -53,6 +60,13 @@ Status setup(bool loopback, TransferMode mode) {
     }
     online = rc == HAL_OK;
     return detail::status(rc);
+}
+
+Status setup(bool loopback, TransferMode mode) {
+    const bool hadIrqReaders = transferMode == TransferMode::Interrupt;
+    const auto result = configureController(loopback, mode);
+    if (hadIrqReaders) rxReady.notify();
+    return result;
 }
 
 Status readFifo(Frame& output) {
@@ -96,6 +110,7 @@ Status startSend(const Frame& f, Ticket& ticket, uint32_t ms) {
     header.IDE = CAN_ID_STD;
     header.RTR = CAN_RTR_DATA;
     header.DLC = f.length;
+    if (transferMode == TransferMode::Interrupt && !txDone.reset()) return Status::NotInitialized;
     irqTx.store(Status::Busy);
     // We own all three mailboxes and allow one outstanding frame at a time.
     hcan.Instance->TSR = CAN_TSR_RQCP0 | CAN_TSR_RQCP1 | CAN_TSR_RQCP2;
@@ -119,7 +134,8 @@ Status waitSent(Ticket ticket) {
             if (recovered != Status::Ok) return recovered;
             return busOff ? Status::BusError : Status::Timeout;
         }
-        detail::nextTick();
+        if (transferMode == TransferMode::Interrupt) txDone.wait(tx.start, tx.duration);
+        else detail::nextTick();
     }
 }
 
@@ -137,18 +153,29 @@ Status send(const Frame& frame, uint32_t ms) {
 Status receive(Frame& output, uint32_t ms) {
     if (ms > INT32_MAX) return Status::InvalidArgument;
     const uint32_t start = HAL_GetTick();
+    bool waitedForIrq = false;
     for (;;) {
+        bool irqMode;
         {
             detail::Gate lock(gate);
+            // A reconfiguration can change how other receivers should wait.
+            if (waitedForIrq && (!lock || !online || transferMode != TransferMode::Interrupt))
+                rxReady.notify();
             if (!lock) return Status::Busy;
             if (!online) return Status::NotInitialized;
-            if (transferMode == TransferMode::Interrupt) {
+            irqMode = transferMode == TransferMode::Interrupt;
+            if (irqMode) {
                 const auto fault = rxFault.exchange(Status::Ok);
-                if (fault != Status::Ok) return fault;
+                if (fault != Status::Ok) {
+                    rxReady.notify();
+                    return fault;
+                }
                 const auto index = tail.load();
                 if (index != head.load()) {
                     output = ring[index % ring.size()];
                     tail.store(index + 1);
+                    // A single IRQ may have enqueued more than one frame.
+                    if (index + 1 != head.load()) rxReady.notify();
                     return Status::Ok;
                 }
             } else {
@@ -158,10 +185,15 @@ Status receive(Frame& output, uint32_t ms) {
                 }
                 if (HAL_CAN_GetRxFifoFillLevel(&hcan, CAN_RX_FIFO0)) return readFifo(output);
             }
-            if (hcan.Instance->ESR & CAN_ESR_BOFF) return Status::BusError;
+            if (hcan.Instance->ESR & CAN_ESR_BOFF) {
+                if (irqMode) rxReady.notify();
+                return Status::BusError;
+            }
         }
         if (detail::expired(start, ms)) return Status::Timeout;
-        detail::nextTick();
+        waitedForIrq = irqMode;
+        if (irqMode) rxReady.wait(start, ms);
+        else detail::nextTick();
     }
 }
 
@@ -188,15 +220,22 @@ void onRx(CAN_HandleTypeDef* peripheral) {
         ring[index % ring.size()] = frame;
         head.store(index + 1);
     }
+    rxReady.notify();
 }
 void onTx(CAN_HandleTypeDef* peripheral, Status status) {
-    if (peripheral == &hcan) irqTx.store(status);
+    if (peripheral != &hcan) return;
+    irqTx.store(status);
+    txDone.notify();
 }
 void onError(CAN_HandleTypeDef* peripheral) {
     if (peripheral != &hcan) return;
     const uint32_t code = HAL_CAN_GetError(&hcan);
     if (code & HAL_CAN_ERROR_RX_FOV0) rxFault.store(Status::Overflow);
-    if (code & (txErrors | HAL_CAN_ERROR_BOF)) irqTx.store(Status::BusError);
+    if (code & (HAL_CAN_ERROR_RX_FOV0 | HAL_CAN_ERROR_BOF)) rxReady.notify();
+    if (code & (txErrors | HAL_CAN_ERROR_BOF)) {
+        irqTx.store(Status::BusError);
+        txDone.notify();
+    }
     // HAL accumulates errors. Consume them here so a later RX-only error cannot fail a new TX.
     (void)HAL_CAN_ResetError(&hcan);
 }
