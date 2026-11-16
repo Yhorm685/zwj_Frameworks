@@ -27,6 +27,6 @@ flowchart TD
 | --- | --- | --- | --- |
 | Sensor，仅 F103 | AboveNormal / 1024 B | 每 20 ms 采样，4 项命令队列；首次、请求、异常或降采样后的结果送至 8 项事件队列 | 采样优先于日志，变慢的串口不会占用 I²C。连续失败停止采样并等待重新初始化。 |
 | Comm，双板 | Normal / 1024 B | 接收中断或事件队列置位唤醒；在帧间超时处检查解析器；唯一日志写入者 | 保持字节与帧顺序，防止多个任务交错输出。 |
-| Monitor，仅 F103 | BelowNormal / 1024 B | 每 1 s 比较 RTOS tick 与 TIM2 计数，报告剩余堆、Sensor/Monitor 栈高水位、丢弃事件及采样超期数 | 资源观测不抢占采样。Comm 自身余量通过命令 05 读取。 |
+| Monitor，仅 F103 | BelowNormal / 1024 B | 每 1 s 比较 RTOS tick 与 TIM2 计数，报告剩余堆、Sensor/Monitor 栈高水位、丢弃事件及采样超期数 | 资源观测不抢占采样。Comm 自身余量通过命令 05 读取。每次处理 Monitor 报告时，Comm 另输出自启动以来上报 BusError、Timeout、ChecksumError 的次数和日志写失败次数，字段分别为 `bus`、`timeout`、`checksum`、`log_write`。注入故障也计数。 |
 
 F103 的 FreeRTOS 堆为 10 KiB。链接器报告包含预留堆，运行余量需从 MON 记录取得。ISR 只搬运数据、记录状态或唤醒任务；上位机在收到上一条应答后再进行耗时的屏幕或 CAN 验收。

@@ -160,6 +160,7 @@ void drainWorkers(Logger& log) {
                 (unsigned long)e.sensorStack, (unsigned long)e.monitorStack,
                 (unsigned long)dropped.load(), (unsigned long)e.late);
             logResult(log, "MON", Status::Ok, line);
+            logCommunicationErrors(log);
             break;
         case EventKind::Init:
             validSample = false;

@@ -31,7 +31,7 @@ TIM2 配为 1 MHz 计数、ARR=999；TIM3 配为 1 MHz 计数、ARR=19999，CH3/
 
 ## 步骤 5 · 接入 I²C 和 MPU6050
 
-在 CubeMX 的 FreeRTOS Tasks and Queues 页面配置三项任务及两项消息队列。CubeMX 生成对象、容量、存储、优先级和栈；应用负责采样循环、启动同步和错误处理。[传感器验证](i2c-mpu6050.md)
+在 CubeMX 的 FreeRTOS Tasks and Queues 页面配置三项任务及两项消息队列。CubeMX 生成对象、容量、存储、优先级和栈；应用负责采样循环、启动同步和错误处理。集成版本的 MON 已补充总线错误、超时、帧校验错误及日志写失败的累计数，随最终版本统一验证。[传感器验证](i2c-mpu6050.md)
 
 ## 步骤 6 · 接入七针 OLED
 

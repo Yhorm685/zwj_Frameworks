@@ -7,7 +7,8 @@ namespace fw::app {
 namespace {
 constexpr uint32_t consoleEvent = 1U;
 constexpr uint32_t serviceEvent = 2U;
-uint32_t logFailures{};
+// Comm owns both the log sink and the counters for reported events.
+uint32_t busErrors{}, timeouts{}, checksumErrors{}, logFailures{};
 
 void wakeConsole(void* task) {
     osThreadFlagsSet(task, consoleEvent);
@@ -70,8 +71,24 @@ void exchange(Frame frame, Uart& port, Logger& log) {
 }
 
 void logResult(Logger& log, const char* source, Status status, const char* message) {
+    switch (status) {
+    case Status::BusError: ++busErrors; break;
+    case Status::Timeout: ++timeouts; break;
+    case Status::ChecksumError: ++checksumErrors; break;
+    default: break;
+    }
     if (log.write(source, status, message, 50) != Status::Ok) ++logFailures;
 }
+
+#ifdef FRAMEWORK_F103
+void logCommunicationErrors(Logger& log) {
+    char message[80];
+    std::snprintf(message, sizeof(message), "bus=%lu timeout=%lu checksum=%lu log_write=%lu",
+        static_cast<unsigned long>(busErrors), static_cast<unsigned long>(timeouts),
+        static_cast<unsigned long>(checksumErrors), static_cast<unsigned long>(logFailures));
+    logResult(log, "MON", Status::Ok, message);
+}
+#endif
 
 void logValue(Logger& log, const char* source, Status status, const char* label, int32_t value) {
     char message[64];
