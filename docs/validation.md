@@ -48,3 +48,14 @@
 | I²C 和 RTOS 对象 | ead95fe | 34576 / 17608 |
 | OLED | 960e987 | 38032 / 17848 |
 | CAN | 0782d41 | 42240 / 18032 |
+
+## 两板集成固件构建
+
+固件源码为 `b172010`。在各自板目录用 Arm GNU 14.3.1、CMake 和 Ninja 分别配置 Debug、Release，均用 `cmake --build --preset <预设名> --clean-first` 完整编译并链接。各工程的 Ozone 入口默认加载 Debug ELF。
+
+| 目标 | 构建预设 | 链接器 Flash 占用 | 链接器 RAM 占用 | Debug 固件（相对于仓库） |
+| --- | --- | --- | --- | --- |
+| F103C8T6 完整框架 | Debug、Release 均成功 | 44256 / 65536 B | 18384 / 20480 B | `boards/f103/build/Debug/f103.elf` |
+| F407ZGT6 串口与 TIM2 移植 | Debug、Release 均成功 | 22476 / 1048576 B | 16744 / 131072 B，另有 CCMRAM 使用 0 B | `boards/f407/build/Debug/f407.elf` |
+
+两种预设的 C/C++ 均使用体积优化，Debug 保留调试信息。表中 RAM 来自链接器分区统计。最终验收时另行采集任务栈高水位和运行期剩余堆，核对 F407 实板晶振，并从干净检出复核构建。
