@@ -10,8 +10,10 @@
 namespace fw::app {
 void startServices(Logger& log) {
     auto& clock = board::clockTimer();
-    logResult(log, "TIM2", clock.waitUpdate(10), "polled update");
-    logResult(log, "TIM2", clock.startPeriodic(), "1 ms interrupt");
+    const auto polled = clock.waitUpdate(10);
+    if (polled != Status::Ok) logResult(log, "TIM2", polled, "polled update");
+    const auto periodic = clock.startPeriodic();
+    if (periodic != Status::Ok) logResult(log, "TIM2", periodic, "1 ms interrupt");
 #ifdef FRAMEWORK_F103
     startWorkers(log);
 #endif
@@ -25,10 +27,6 @@ void serviceEvents(Logger& log) {
 }
 
 bool boardCommand(Frame frame, Logger& log) {
-    if (frame.command == 0x10) {
-        logValue(log, "TIM2", Status::Ok, "ticks", board::clockTimer().ticks());
-        return true;
-    }
 #ifdef FRAMEWORK_F103
     if (canCommand(frame, log)) return true;
     if (displayCommand(frame, log)) return true;
@@ -61,6 +59,9 @@ bool boardCommand(Frame frame, Logger& log) {
         logValue(log, second ? "PITCH" : "YAW", result, "arg", frame.argument);
         return true;
     }
+#else
+    (void)frame;
+    (void)log;
 #endif
     return false;
 }

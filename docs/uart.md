@@ -4,12 +4,14 @@ USART1 为 115200、8N1。每个命令为四字节 `A5 CMD ARG SUM`，SUM 取前
 
 | CMD | 作用 | 观察 |
 | --- | --- | --- |
-| 01 | 回送 ARG | ECHO、Ok 和参数值 |
-| 02 | 中断发送并尝试提交第二笔 | IT TX、Busy 和第一笔最终结果 |
-| 03 / 04 | 暂停命令接收，以阻塞 / 定长中断方式接收单字节 | 收到提示后 500 ms 内发一个字节，或留空以触发超时；随后恢复命令接收 |
-| 05 | 查询通信任务 | 剩余栈字节数、日志发送失败次数 |
+| 01 | 回送 ARG，确认串口双向通信 | `A5 01 11 B7` 返回 `[ECHO][Ok] arg=17` |
+| 05 | 按需查询状态 | `A5 05 00 AA` 在 F103 返回资源和错误计数，在 F407 返回 Comm 剩余栈和日志写失败次数 |
 
-PC 端装有 pyserial 时，运行 `python tools/console.py COM5 smoke`。它会检查连续两帧、坏校验、半帧超时、中断发送、两种接收的成功和超时，以及出错后的下一帧。将 COM5 换为实际串口，先关闭占用端口的串口助手。单发示例为 `python tools/console.py COM5 0x01 17`。端口收发、脚本输出和实际固件版本应一起留存。
+集成版启动成功后等待命令，空闲时仅上报故障。已退役的 `02/03/04/10` 按未知命令处理，回报 `[CMD][InvalidArgument] unknown command`。BSP 保留阻塞和中断收发接口。
+
+F103 的 `05` 返回两行。首行 `[MON][Ok] dt_ms=… heap=… stacks=…/…/… lost=… late=…`，栈余量按 Comm、Sensor、Monitor 排列，单位字节。若监测任务还未产出首个样本，首行为 `[MON][Busy] first report pending`。第二行 `[MON][Ok] bus=… timeout=… checksum=… log_write=…` 给出自启动以来的累计次数。F407 只返回 `[COMM][Ok] stack_free_B=… log_errors=…`。
+
+PC 端安装 pyserial 后，运行 `python tools/console.py COM4 smoke` 检查连续回显、坏校验、半帧超时及恢复。单发示例为 `python tools/console.py COM4 0x01 17`，端口按实际设备选择。
 
 ## 步骤 3 独立固件
 
@@ -24,7 +26,7 @@ PC 端装有 pyserial 时，运行 `python tools/console.py COM5 smoke`。它会
 | 5 | `A5 01`，等待超过 20 ms | `[FRAME][Timeout] partial frame` |
 | 6 | `A5 02 00 A7` | 依次输出 `IT TX`、`[UART][Busy] second start`、`[UART][Ok] interrupt TX final` |
 
-请保留复位首行和各次命令的原始回包。全部测试还包括阻塞及定长中断接收的成功、超时和恢复；安装有 pyserial 时可关闭串口助手，用仓库根目录的 `python tools/console.py COM4 smoke` 自动执行。
+在固定固件上保留复位首行和各次回包。复现该版完整收发序列时，关闭串口助手，在仓库根目录用 PowerShell 运行 `git show 84fd7fd:tools/console.py | python - COM4 smoke`。该脚本包含历史固件的阻塞与定长中断单字节收发验收。
 
 从新检出的仓库复现独立构建时，在仓库根目录运行下列 PowerShell 命令；首次建立源码工作树后，后续可直接重新构建。
 

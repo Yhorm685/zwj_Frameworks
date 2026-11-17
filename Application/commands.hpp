@@ -9,8 +9,5 @@ void startServices(Logger& log);
 void serviceEvents(Logger& log);
 bool boardCommand(Frame frame, Logger& log);
 void logResult(Logger& log, const char* source, Status status, const char* message);
-#ifdef FRAMEWORK_F103
-void logCommunicationErrors(Logger& log);
-#endif
 void logValue(Logger& log, const char* source, Status status, const char* label, int32_t value);
 }

@@ -15,7 +15,7 @@ extern osMessageQueueId_t requestQueueHandle, eventQueueHandle;
 
 namespace fw::app {
 namespace {
-enum EventKind : uint8_t { Sample, Init, MissingAddress, Monitor };
+enum EventKind : uint8_t { Sample, Snapshot, Init, MissingAddress, Monitor };
 using Event = FrameworkSensorEvent;
 static_assert(sizeof(Frame) == 2 && sizeof(Frame) == sizeof(FrameworkRequest));
 static_assert(std::is_trivially_copyable_v<Frame>);
@@ -24,6 +24,8 @@ std::atomic<uint32_t> dropped{}, lateCycles{};
 mpu6050::Sample lastSample{};
 bool validSample{};
 bool workersReady{};
+Event lastMonitor{};
+bool haveMonitorReport{};
 
 void post(const Event& event) {
     if (osMessageQueuePut(eventQueueHandle, &event, 0, 0) != osOK) ++dropped;
@@ -41,16 +43,19 @@ void sampleTask() {
         Frame request{};
         const bool commanded = osMessageQueueGet(requestQueueHandle, &request, nullptr, 0) == osOK;
         Event event{};
-        if (first || (commanded && request.command == 0x20)) {
+        const bool initRequested = commanded && request.command == 0x20;
+        if (first || initRequested) {
             first = false;
-            if (commanded && request.command == 0x20)
+            if (initRequested)
                 mode = request.argument ? TransferMode::Interrupt : TransferMode::Blocking;
             auto status = i2c::recover();
             if (status == Status::Ok) status = mpu6050::initialize(mode);
             online = status == Status::Ok;
-            event.kind = EventKind::Init;
-            event.result = static_cast<uint8_t>(status);
-            post(event);
+            if (initRequested || !online) {
+                event.kind = EventKind::Init;
+                event.result = static_cast<uint8_t>(status);
+                post(event);
+            }
         }
         if (commanded && request.command == 0x22) {
             uint8_t unused{};
@@ -60,7 +65,7 @@ void sampleTask() {
         }
         const bool snapshot = commanded && request.command == 0x21;
         if (online || snapshot) {
-            event.kind = EventKind::Sample;
+            event.kind = snapshot ? EventKind::Snapshot : EventKind::Sample;
             const auto readMode = snapshot ? (request.argument ? TransferMode::Interrupt : TransferMode::Blocking) : mode;
             mpu6050::Sample value{};
             const auto result = online ? mpu6050::sample(value, readMode) : Status::NotInitialized;
@@ -69,7 +74,7 @@ void sampleTask() {
             event.ax = value.ax; event.ay = value.ay; event.az = value.az;
             event.temperature = value.temperature;
             event.gx = value.gx; event.gy = value.gy; event.gz = value.gz;
-            if (snapshot || !online || cycles % 50 == 0) post(event);
+            if (snapshot || !online || initRequested || cycles % 50 == 0) post(event);
         }
         ++cycles;
         deadline += period;
@@ -84,25 +89,21 @@ void sampleTask() {
 
 void monitorTask() {
     uint32_t deadline = osKernelGetTickCount();
-    uint32_t lastTicks = board::clockTimer().ticks();
     uint32_t lastTime = deadline;
     for (;;) {
         deadline += osKernelGetTickFreq();
         if (static_cast<int32_t>(deadline - osKernelGetTickCount()) <= 0)
             deadline = osKernelGetTickCount() + osKernelGetTickFreq();
         osDelayUntil(deadline);
-        const uint32_t ticks = board::clockTimer().ticks();
         const uint32_t now = osKernelGetTickCount();
         Event report{};
         report.kind = EventKind::Monitor;
-        report.ticks = ticks - lastTicks;
         report.elapsedMs = now - lastTime;  // Both board configurations use a 1 kHz RTOS tick.
         report.heap = xPortGetFreeHeapSize();
+        report.commStack = osThreadGetStackSpace(commHandle);
         report.sensorStack = osThreadGetStackSpace(sensorHandle);
         report.monitorStack = osThreadGetStackSpace(osThreadGetId());
-        report.late = lateCycles.load();
         post(report);
-        lastTicks = ticks;
         lastTime = now;
     }
 }
@@ -129,7 +130,7 @@ void startWorkers(Logger& log) {
     const auto first = osThreadFlagsSet(sensorHandle, workerReady);
     const auto second = osThreadFlagsSet(monitorHandle, workerReady);
     workersReady = ((first | second) & osFlagsError) == 0;
-    logResult(log, "RTOS", workersReady ? Status::Ok : Status::NotInitialized, "Sensor/Monitor startup");
+    if (!workersReady) logResult(log, "RTOS", Status::NotInitialized, "Sensor/Monitor startup");
 }
 
 bool latestSample(mpu6050::Sample& output) {
@@ -144,8 +145,25 @@ bool sensorCommand(Frame frame, Logger& log) {
     if (frame.argument > 1) result = Status::InvalidArgument;
     else if (workersReady)
         result = osMessageQueuePut(requestQueueHandle, &frame, 0, 0) == osOK ? Status::Ok : Status::Overflow;
-    logResult(log, "SENSOR", result, "command enqueue");
+    if (result != Status::Ok) logResult(log, "SENSOR", result, "command enqueue");
     return true;
+}
+
+void logWorkerResources(Logger& log) {
+    if (!workersReady) {
+        logResult(log, "MON", Status::NotInitialized, "workers");
+        return;
+    }
+    if (!haveMonitorReport) {
+        logResult(log, "MON", Status::Busy, "first report pending");
+        return;
+    }
+    char line[112];
+    std::snprintf(line, sizeof(line), "dt_ms=%lu heap=%lu stacks=%lu/%lu/%lu lost=%lu late=%lu",
+        (unsigned long)lastMonitor.elapsedMs, (unsigned long)lastMonitor.heap,
+        (unsigned long)lastMonitor.commStack, (unsigned long)lastMonitor.sensorStack,
+        (unsigned long)lastMonitor.monitorStack, (unsigned long)dropped.load(), (unsigned long)lateCycles.load());
+    logResult(log, "MON", Status::Ok, line);
 }
 
 void drainWorkers(Logger& log) {
@@ -155,32 +173,27 @@ void drainWorkers(Logger& log) {
         const auto result = static_cast<Status>(e.result);
         switch (e.kind) {
         case EventKind::Monitor:
-            std::snprintf(line, sizeof(line), "dt=%lu tim2=%lu heap=%lu stacks=%lu/%lu lost=%lu late=%lu",
-                (unsigned long)e.elapsedMs, (unsigned long)e.ticks, (unsigned long)e.heap,
-                (unsigned long)e.sensorStack, (unsigned long)e.monitorStack,
-                (unsigned long)dropped.load(), (unsigned long)e.late);
-            logResult(log, "MON", Status::Ok, line);
-            logCommunicationErrors(log);
+            lastMonitor = e;
+            haveMonitorReport = true;
             break;
         case EventKind::Init:
             validSample = false;
-            logResult(log, "MPU", result, "WHO_AM_I and config readback");
+            logResult(log, "MPU", result, "init");
             break;
         case EventKind::MissingAddress:
             logResult(log, "I2C", result, "probe 0x67");
             break;
         case EventKind::Sample:
+        case EventKind::Snapshot:
             validSample = result == Status::Ok;
             if (!validSample) {
                 logResult(log, "MPU", result, "sample");
                 break;
             }
             lastSample = {e.ax, e.ay, e.az, e.temperature, e.gx, e.gy, e.gz};
+            if (e.kind == EventKind::Sample) break;
             std::snprintf(line, sizeof(line), "acc=%d,%d,%d gyro=%d,%d,%d",
                 e.ax, e.ay, e.az, e.gx, e.gy, e.gz);
-            logResult(log, "MPU", result, line);
-            std::snprintf(line, sizeof(line), "ax_mg=%ld gx_mdps=%ld",
-                (long)mpu6050::accelMilliG(e.ax), (long)mpu6050::gyroMilliDps(e.gx));
             logResult(log, "MPU", result, line);
             break;
         }

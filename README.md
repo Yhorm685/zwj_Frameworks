@@ -12,7 +12,9 @@ cmake --preset Debug
 cmake --build --preset Debug
 ```
 
-集中验收使用 [F103 集成工程](boards/f103/f103.jdebug) 或 [F407 移植工程](boards/f407/f407.jdebug)，Ozone 通过 J-Link/SWD 加载各板 build/Debug 下的 ELF。[最终验收顺序](docs/validation.md#集中验收顺序)。F103 和 F407 的 USART1 均用 PA9/TX、PA10/RX，115200、8N1。检查晶振、供电和接线后上板。F103 固定基线 `57aa484` 的输出是 `F103 BASELINE READY` 和 `TICK 1s`，当前集成固件输出 `[F103][Ok] framework ready`，两者请按提交号区分。
+F103 和 F407 的 USART1 均用 PA9/TX、PA10/RX，115200、8N1。两板集成固件在启动成功、空闲时保持串口安静。要确认串口双向通信，HEX 发送 `A5 01 11 B7`，预期收到 `[ECHO][Ok] arg=17`。后台故障会主动上报。固定基线 `57aa484` 保留其原有的 `TICK 1s` 心跳。
+
+Ozone 通过 J-Link/SWD 加载各板 build/Debug 下的 ELF。[F103 集成工程](boards/f103/f103.jdebug) · [F407 移植工程](boards/f407/f407.jdebug) · [最终验收顺序](docs/validation.md#集中验收顺序)
 
 ## 文档
 
